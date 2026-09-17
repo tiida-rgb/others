@@ -65,10 +65,14 @@ const errors = [];
 page.on('pageerror', e => errors.push(String(e)));
 page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
 
-// スプライトは外部CDNなので、テストでは透明PNGで代替して待ち時間をなくす
-await page.route('**raw.githubusercontent.com/**', route =>
-  route.fulfill({ status: 200, contentType: 'image/png',
-    body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64') }));
+// スプライトは透明PNGで代替して待ち時間をなくす。
+// アプリは sprites/ → CDN の順に試すので、両方を止めないと
+// fetch-sprites.sh を流していない環境で sprites/ が404になり
+// 「コンソールエラーなし」が必ず落ちる。
+const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+const stubPng = route => route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL });
+await page.route('**raw.githubusercontent.com/**', stubPng);
+await page.route('**/sprites/*.png', stubPng);
 
 await page.goto(URL, { waitUntil: 'networkidle' });
 
