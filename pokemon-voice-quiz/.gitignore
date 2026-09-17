@@ -1,0 +1,5 @@
+# fetch-sprites.sh で落としてくる画像（第三者の素材なのでリポジトリには入れない）
+sprites/
+
+# テスト用（npm i playwright）
+node_modules/
