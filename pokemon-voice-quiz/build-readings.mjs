@@ -14,11 +14,6 @@
  * サイズを抑えるため、ポケモン名のどこにも現れない読みは捨てる（1025匹の名前に
  * 出てこない読みは、どう転んでも一致しないので持つ意味がない）。data.js を作り
  * 直したらこちらも流し直すこと。
- *
- * データ出典:
- *   KANJIDIC2 — Electronic Dictionary Research and Development Group (EDRDG)
- *   https://www.edrdg.org/wiki/index.php/KANJIDIC_Project
- *   Creative Commons Attribution-ShareAlike 4.0 International
  */
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -93,10 +88,6 @@ const body = `// 漢字→読み の表（build-readings.mjs による自動生�
 //
 // 形式: 「漢字:読み,読み,…」を半角スペース区切り
 // ポケモン1025匹の名前に現れない読みは落としてある（data.js を作り直したら要再生成）。
-//
-// 出典: KANJIDIC2 / Electronic Dictionary Research and Development Group (EDRDG)
-//       https://www.edrdg.org/wiki/index.php/KANJIDIC_Project
-//       Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
 window.KANJI_READINGS = ${JSON.stringify(rows.join(' '))};
 `;
 

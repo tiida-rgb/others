@@ -133,10 +133,5 @@ node test-browser.mjs
 
 ポケモン名データは [PokeAPI](https://github.com/PokeAPI/pokeapi)（`pokemon_species_names.csv`）、
 画像は [PokeAPI/sprites](https://github.com/PokeAPI/sprites) から取得しています。
-
-漢字の読み（`kanji-readings.js`）は [KANJIDIC2](https://www.edrdg.org/wiki/index.php/KANJIDIC_Project) から
-生成しています。KANJIDIC2 は Electronic Dictionary Research and Development Group (EDRDG) の著作物で、
-[Creative Commons Attribution-ShareAlike 4.0](https://creativecommons.org/licenses/by-sa/4.0/) で提供されています。
-`kanji-readings.js` はその派生物なので、同じ CC BY-SA 4.0 が及びます。
 ポケモンおよびポケモンのキャラクターは任天堂・クリーチャーズ・ゲームフリークの登録商標です。
 これは個人的に遊ぶためのファンメイドのクイズで、非公式です。
