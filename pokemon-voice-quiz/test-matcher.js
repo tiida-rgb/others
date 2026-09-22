@@ -5,6 +5,7 @@
 'use strict';
 global.window = global;
 require('./data.js');
+require('./kanji-readings.js');
 var Matcher = require('./matcher.js');
 
 var LIST = window.POKEMON_ALL;
@@ -144,6 +145,60 @@ section('複数まとめて認識');
   var ids = idsOf(t[0]).sort(function (a, b) { return a - b; });
   var want = t[1].slice().sort(function (a, b) { return a - b; });
   check(ids.join() === want.join(), '「' + t[0] + '」', '得られたid: ' + ids.join());
+});
+
+/* ---- 5b. 漢字で返ってきたものを読みに戻して拾う ---- */
+section('漢字からの復元');
+check(typeof window.KANJI_READINGS === 'string' && window.KANJI_READINGS.length > 10000,
+      '漢字→読みの表が読み込めている');
+
+// 手書きの別名を全部外したマッチャ。data.js の別名に頼らず、読みだけで
+// どこまで解けるかを見る（＝これから出てくる未知の漢字変換への強さ）。
+var bare = new Matcher(LIST.map(function (p) { return { id: p.id, name: p.name, aliases: [] }; }));
+function bareIds(text) {
+  var r = [];
+  bare.match(text).forEach(function (h) {
+    h.ids.forEach(function (id) { if (r.indexOf(id) === -1) r.push(id); });
+  });
+  return r;
+}
+
+// 別名を1件も持たせていないのに解けること
+[['蛯原', 107], ['海老原', 107], ['沢村', 106], ['澤村', 106], ['銭亀', 7],
+ ['不思議だね', 1], ['毒クラゲ', 73], ['石つぶて', 74], ['鴨ネギ', 83], ['怒り猿', 57],
+ // 第2世代以降（手書きの漢字別名は1件も無い）
+ ['闇カラス', 198], ['電竜', 181], ['宿キング', 199], ['鮫肌', 319], ['雷公', 243], ['炎帝', 244],
+].forEach(function (t) {
+  var ids = bareIds(t[0]);
+  check(ids.length === 1 && ids[0] === t[1],
+        '別名なしで「' + t[0] + '」→ ' + byId[t[1]].name, '得られたid: ' + ids.join(','));
+});
+
+// 手書きの漢字別名のうち、読みだけで解ける割合。下がったら気づけるように見張る。
+var kanjiAliases = [];
+LIST.forEach(function (p) {
+  (p.aliases || []).forEach(function (a) {
+    if (/[\u3005\u4e00-\u9fff]/.test(a)) kanjiAliases.push([a, p.id]);
+  });
+});
+var solved = kanjiAliases.filter(function (t) { return bareIds(t[0]).indexOf(t[1]) !== -1; }).length;
+check(solved / kanjiAliases.length >= 0.85,
+      '手書き漢字別名の85%以上が読みだけで解ける',
+      solved + '/' + kanjiAliases.length);
+
+// 名乗り読みまで使うと漢字の読みは緩い。普通の熟語を拾わないこと。
+// （ここが崩れると、喋っただけで関係ないマスが埋まる）
+['会議', '資料', '電話', '明日', '来週', '部長', '駅前', '時間', '写真', '音楽', '友達',
+ '仕事', '電車', '子供', '週末', '機能', '原因', '東京', '沢山', '田中', '山田', '小林',
+ '高橋', '中村', '花見', '登山', '道路', '帰宅', '電池', '充電', '予約', '会計', '在庫',
+ '納期', '提出', '確認', '連絡', '相談', '報告', '検討', '対応', '修正', '削除', '追加',
+ '変更', '開始', '終了', '保存', '印刷', '送信', '更新', '設定', '表示', '入力', '出力',
+ '計算', '今週', '昨日', '午前', '午後', '夕方', '深夜', '朝食', '夕食', '出張', '残業',
+ '風鈴', '海坊主', '大鎌', '土竜', '今日', '見積',
+].forEach(function (w) {
+  var ids = bareIds(w);
+  check(ids.length === 0, '熟語「' + w + '」では何も埋まらない',
+        '拾ってしまった: ' + ids.map(function (i) { return byId[i].name; }).join(','));
 });
 
 /* ---- 6. 誤爆しないこと（普通の日本語を1匹も拾わない） ---- */

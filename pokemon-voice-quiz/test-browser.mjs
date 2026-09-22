@@ -226,6 +226,20 @@ await page.click('#revealBtn');
 await page.waitForTimeout(80);
 ok(!(await page.locator('.cell[data-id="150"] .name').isVisible()), 'もう一度押すと隠れる');
 
+console.log('\n# 漢字で返ってきても拾う');
+// data.js に漢字別名を持たない第2世代。kanji-readings.js の読み表だけが頼り。
+await page.waitForFunction(() => typeof window.KANJI_READINGS === 'string', null, { timeout: 5000 })
+  .then(() => ok(true, '漢字→読みの表が読み込まれる'))
+  .catch(() => ok(false, '漢字→読みの表が読み込まれる'));
+await page.evaluate(() => window.__speak(['闇カラス'], true));
+await page.waitForTimeout(150);
+ok(await page.locator('.tab[data-gen="2"] .tab-count').textContent() === '1/100',
+   '「闇カラス」がヤミカラスとして埋まる', await page.locator('.tab[data-gen="2"] .tab-count').textContent());
+await page.evaluate(() => window.__speak(['会議の資料を送ります'], true));
+await page.waitForTimeout(150);
+ok(await page.locator('.tab[data-gen="2"] .tab-count').textContent() === '1/100',
+   '漢字まじりの普通の会話では増えない');
+
 console.log('\n# 世代タブ');
 // ここまでのテストで何匹埋まっているかは決め打ちできないので、増減で見る
 const num = async (sel) => Number(await page.locator(sel).textContent());
