@@ -4,4 +4,4 @@
 
 | フォルダ | 中身 |
 | --- | --- |
-| [`pokemon-voice-quiz/`](pokemon-voice-quiz/) | 第1世代ポケモン151匹を声で言って埋めるクイズ（ブラウザだけで動く） |
+| [`pokemon-voice-quiz/`](pokemon-voice-quiz/) | 第1〜第9世代のポケモン1025匹を声で言って埋めるクイズ（ブラウザだけで動く） |

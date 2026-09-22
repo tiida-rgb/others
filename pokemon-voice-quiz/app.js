@@ -1,27 +1,45 @@
 /*
- * app.js — カントー151 音声クイズ
+ * app.js — ぜんこく1025 音声クイズ
  *
  * マイクを開きっぱなしにして（continuous + 自動再起動）、聞こえた言葉を
  * matcher.js に渡し、当たったマスを埋めていく。
+ *
+ * 世代ごとにタブを分けるが、聞き取りの対象は常に全1025匹。どの世代の名前を
+ * 言ってもその世代のタブに埋まる（表示していないタブでも埋まる）ので、
+ * タブを切り替えながら喋る必要はない。
  */
 (function () {
   'use strict';
 
-  var LIST = window.POKEMON_GEN1;
+  var LIST = window.POKEMON_ALL;
+  var GENS = window.POKEMON_GENERATIONS;
   var BY_ID = {};
-  LIST.forEach(function (p) { BY_ID[p.id] = p; });
+  var BY_GEN = {};                      // 世代 -> その世代のポケモン配列
+  var GEN_META = {};                    // 世代 -> { region, size }
+  LIST.forEach(function (p) {
+    BY_ID[p.id] = p;
+    (BY_GEN[p.gen] || (BY_GEN[p.gen] = [])).push(p);
+  });
+  GENS.forEach(function (g) {
+    GEN_META[g.gen] = { gen: g.gen, region: g.region, size: g.to - g.from + 1 };
+  });
 
+  // 聞き取りは全世代まとめて。1025匹入れても普通の日本語は拾わないことを
+  // test-matcher.js の「誤爆しない」で確かめている。
   var matcher = new window.PokeMatcher(LIST);
   // 画像は同梱していないので、まず同じフォルダの sprites/ を見に行き、
   // 無ければ PokeAPI の CDN、それも駄目なら画像なしで表示する（名前だけでも遊べる）。
   var SPRITE_LOCAL = 'sprites/';
   var SPRITE_CDN = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
-  var STORE_KEY = 'kanto151-voice-quiz.v1';
+  var STORE_KEY = 'pokemon-voice-quiz.v2';
+  var STORE_KEY_V1 = 'kanto151-voice-quiz.v1';   // カントー151だけだった頃の保存
   var LOG_MAX = 60;
 
   var $ = function (id) { return document.getElementById(id); };
   var el = {
-    grid: $('grid'), count: $('count'), timer: $('timer'),
+    grid: $('grid'), count: $('count'), countMax: $('countMax'),
+    countLabel: $('countLabel'), total: $('total'), timer: $('timer'),
+    tabs: $('tabs'),
     progress: $('progress'), progressBar: $('progressBar'),
     micBtn: $('micBtn'), micBtnLabel: $('micBtnLabel'),
     micStatusText: $('micStatusText'), interim: $('interim'),
@@ -33,8 +51,11 @@
 
   /* ===================== 状態 ===================== */
 
-  var answered = Object.create(null);   // id -> true
-  var answeredCount = 0;
+  var answered = Object.create(null);   // id -> true（全世代ぶん）
+  var answeredCount = 0;                // 全世代の合計
+  var countByGen = Object.create(null); // 世代 -> 埋まった数
+  var currentGen = GENS[0].gen;         // 表示中のタブ
+  var tabEls = {};
   var elapsedMs = 0;
   var runningSince = null;              // 計測中なら開始時刻
   var revealed = false;
@@ -49,6 +70,7 @@
         answered: Object.keys(answered).map(Number),
         elapsedMs: totalElapsed(),
         soundOn: soundOn,
+        gen: currentGen,
         savedAt: Date.now()
       }));
     } catch (e) { /* プライベートモードなどでは保存できない。無視する */ }
@@ -56,23 +78,76 @@
 
   function load() {
     var raw;
-    try { raw = localStorage.getItem(STORE_KEY); } catch (e) { return; }
+    // v1（カントーだけ）の保存も読む。id は変わっていないのでそのまま第1世代に入る。
+    try { raw = localStorage.getItem(STORE_KEY) || localStorage.getItem(STORE_KEY_V1); } catch (e) { return; }
     if (!raw) return;
     try {
       var data = JSON.parse(raw);
       (data.answered || []).forEach(function (id) {
-        if (BY_ID[id] && !answered[id]) { answered[id] = true; answeredCount++; }
+        if (!BY_ID[id] || answered[id]) return;
+        answered[id] = true;
+        answeredCount++;
+        countByGen[BY_ID[id].gen] = (countByGen[BY_ID[id].gen] || 0) + 1;
       });
       elapsedMs = data.elapsedMs || 0;
       if (typeof data.soundOn === 'boolean') soundOn = data.soundOn;
+      if (GEN_META[data.gen]) currentGen = data.gen;
     } catch (e) { /* 壊れていたら捨てる */ }
+  }
+
+  /* ===================== 世代タブ ===================== */
+
+  function buildTabs() {
+    GENS.forEach(function (g) {
+      var tab = document.createElement('button');
+      tab.type = 'button';
+      tab.className = 'tab';
+      tab.dataset.gen = String(g.gen);
+      tab.setAttribute('role', 'tab');
+      tab.title = '第' + g.gen + '世代  No.' + pad(g.from) + '-' + pad(g.to);
+
+      var region = document.createElement('span');
+      region.textContent = g.region;
+      var count = document.createElement('span');
+      count.className = 'tab-count';
+
+      tab.append(region, count);
+      tabEls[g.gen] = { root: tab, count: count };
+      el.tabs.appendChild(tab);
+    });
+    el.tabs.addEventListener('click', function (ev) {
+      var tab = ev.target.closest('.tab');
+      if (tab) selectGen(Number(tab.dataset.gen));
+    });
+  }
+
+  function renderTabs() {
+    GENS.forEach(function (g) {
+      var t = tabEls[g.gen];
+      var done = countByGen[g.gen] || 0;
+      t.count.textContent = done + '/' + GEN_META[g.gen].size;
+      t.root.setAttribute('aria-selected', g.gen === currentGen ? 'true' : 'false');
+      t.root.classList.toggle('complete', done >= GEN_META[g.gen].size);
+    });
+  }
+
+  function selectGen(gen) {
+    if (gen === currentGen || !GEN_META[gen]) return;
+    currentGen = gen;
+    buildGrid();
+    renderStats();
+    save();
+    if (tabEls[gen]) tabEls[gen].root.scrollIntoView({ block: 'nearest', inline: 'center' });
   }
 
   /* ===================== グリッド ===================== */
 
+  /** 表示中の世代ぶんだけ作る。1025匹を一度に並べると重いので、タブごとに作り直す。 */
   function buildGrid() {
     var frag = document.createDocumentFragment();
-    LIST.forEach(function (p) {
+    cells = {};
+    el.grid.textContent = '';
+    BY_GEN[currentGen].forEach(function (p) {
       var cell = document.createElement('button');
       cell.type = 'button';
       cell.className = 'cell';
@@ -99,7 +174,10 @@
       frag.appendChild(cell);
     });
     el.grid.appendChild(frag);
-    el.grid.addEventListener('click', onCellClick);
+    BY_GEN[currentGen].forEach(function (p) {
+      if (answered[p.id]) paintCell(p.id, false);
+      else if (revealed) loadSprite(p.id);
+    });
   }
 
   function pad(n) { return ('00' + n).slice(-3); }
@@ -151,6 +229,7 @@
     var id = Number(cell.dataset.id);
     delete answered[id];
     answeredCount--;
+    countByGen[BY_ID[id].gen]--;
     paintCell(id, false);
     renderStats();
     save();
@@ -167,7 +246,8 @@
     if (id === null) return null;        // 全部すでに埋まっている（言い直し）
     answered[id] = true;
     answeredCount++;
-    paintCell(id, true);
+    countByGen[BY_ID[id].gen] = (countByGen[BY_ID[id].gen] || 0) + 1;
+    paintCell(id, true);                 // 表示していない世代ならマスが無いので何もしない
     return id;
   }
 
@@ -176,6 +256,9 @@
    */
   function consume(text) {
     if (!text) return [];
+    var before = Object.create(null);
+    GENS.forEach(function (g) { before[g.gen] = countByGen[g.gen] || 0; });
+
     var got = [];
     matcher.match(text).forEach(function (hit) {
       var id = fill(hit.ids, hit.heard);
@@ -185,33 +268,56 @@
       renderStats();
       save();
       announce(got);
-      beep(answeredCount >= LIST.length ? 'done' : 'hit');
+      var allDone = answeredCount >= LIST.length;
+      beep(allDone ? 'done' : 'hit');
       if (navigator.vibrate) { try { navigator.vibrate(30); } catch (e) {} }
-      if (answeredCount >= LIST.length) finish();
+      if (allDone) finishAll(); else celebrateGens(before);
     }
     return got;
   }
 
   function announce(ids) {
     var first = BY_ID[ids[0]];
-    var label = first.name + (ids.length > 1 ? ' ほか' + (ids.length - 1) + '匹' : '');
+    var label = first.name;
+    // 表示していない世代が埋まったときは、どこに入ったのか分かるようにする
+    if (first.gen !== currentGen) label += '（' + GEN_META[first.gen].region + '）';
+    if (ids.length > 1) label += ' ほか' + (ids.length - 1) + '匹';
     showToast(label, first.id, 'hit');
   }
 
-  function finish() {
+  /** この発話でちょうど言い切った世代があれば祝う */
+  function celebrateGens(before) {
+    GENS.forEach(function (g) {
+      var size = GEN_META[g.gen].size;
+      if ((countByGen[g.gen] || 0) < size || before[g.gen] >= size) return;
+      beep('done');
+      setTimeout(function () {
+        showToast(g.region + 'をコンプリート！', null, 'done', 4000);
+      }, 400);
+    });
+  }
+
+  function finishAll() {
     stopTimer();
     setTimeout(function () {
-      showToast('コンプリート！ ' + formatTime(totalElapsed()), null, 'done', 6000);
+      showToast('1025匹ぜんぶコンプリート！ ' + formatTime(totalElapsed()), null, 'done', 8000);
     }, 500);
   }
 
   /* ===================== 表示更新 ===================== */
 
   function renderStats() {
-    el.count.textContent = String(answeredCount);
-    var pct = (answeredCount / LIST.length) * 100;
+    var meta = GEN_META[currentGen];
+    var done = countByGen[currentGen] || 0;
+    el.count.textContent = String(done);
+    el.countMax.textContent = '/' + meta.size;
+    el.countLabel.textContent = meta.region;
+    el.total.textContent = String(answeredCount);
+    var pct = (done / meta.size) * 100;
     el.progressBar.style.width = pct.toFixed(2) + '%';
-    el.progress.setAttribute('aria-valuenow', String(answeredCount));
+    el.progress.setAttribute('aria-valuemax', String(meta.size));
+    el.progress.setAttribute('aria-valuenow', String(done));
+    renderTabs();
   }
 
   function formatTime(ms) {
@@ -529,23 +635,35 @@
     el.revealBtn.textContent = revealed ? '答えを隠す' : '答えを表示';
     if (revealed) {
       stopTimer();
-      LIST.forEach(function (p) { if (!answered[p.id]) loadSprite(p.id); });
+      BY_GEN[currentGen].forEach(function (p) { if (!answered[p.id]) loadSprite(p.id); });
     } else if (wantListening) {
       startTimer();
     }
   });
 
+  // リセットは表示中の世代だけ。9世代ぶんを確認1回で消せると事故になる。
   el.resetBtn.addEventListener('click', function () {
-    if (!confirm('最初からやり直します。埋めた ' + answeredCount + ' 匹とタイムは消えます。よろしいですか？')) return;
-    Object.keys(answered).forEach(function (id) { delete answered[id]; });
-    answeredCount = 0;
-    elapsedMs = 0;
-    runningSince = wantListening ? Date.now() : null;
+    var meta = GEN_META[currentGen];
+    var done = countByGen[currentGen] || 0;
+    if (!done) { showToast(meta.region + 'はまだ1匹も埋まっていません', null, 'warn'); return; }
+    var rest = answeredCount - done;
+    if (!confirm(meta.region + '（第' + currentGen + '世代）で埋めた ' + done + ' 匹を消します。'
+      + (rest ? 'ほかの世代の ' + rest + ' 匹とタイムはそのままです。' : 'ぜんぶ空になるのでタイムも0に戻ります。')
+      + '\nよろしいですか？')) return;
+
+    BY_GEN[currentGen].forEach(function (p) {
+      if (answered[p.id]) { delete answered[p.id]; answeredCount--; }
+      paintCell(p.id, false);
+    });
+    countByGen[currentGen] = 0;
+    if (answeredCount === 0) {
+      elapsedMs = 0;
+      runningSince = wantListening ? Date.now() : null;
+    }
     revealed = false;
     document.body.classList.remove('revealed');
     el.revealBtn.textContent = '答えを表示';
     el.logList.textContent = '';
-    LIST.forEach(function (p) { paintCell(p.id, false); });
     renderStats();
     renderTimer();
     save();
@@ -561,8 +679,10 @@
   /* ===================== 起動 ===================== */
 
   load();
+  buildTabs();
+  el.grid.addEventListener('click', onCellClick);
   buildGrid();
-  LIST.forEach(function (p) { if (answered[p.id]) paintCell(p.id, false); });
+  if (tabEls[currentGen]) tabEls[currentGen].root.scrollIntoView({ block: 'nearest', inline: 'center' });
   el.soundToggle.checked = soundOn;
   renderStats();
   renderTimer();

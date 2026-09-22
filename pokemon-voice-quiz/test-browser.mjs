@@ -77,7 +77,10 @@ await page.route('**/sprites/*.png', stubPng);
 await page.goto(URL, { waitUntil: 'networkidle' });
 
 console.log('\n# 初期表示');
-ok(await page.locator('.cell').count() === 151, 'マスが151個');
+ok(await page.locator('.cell').count() === 151, '最初は第1世代の151マスだけ出る');
+ok(await page.locator('.tab').count() === 9, 'タブが9つ');
+ok((await page.locator('.tab[aria-selected="true"]').textContent()).includes('カントー'), '最初はカントーが選択されている');
+ok((await page.locator('#total').textContent()) === '0', 'ぜんたいカウンタが0');
 ok((await page.locator('#count').textContent()) === '0', 'カウンタが0');
 ok(await page.locator('.cell.got').count() === 0, '最初は誰も埋まっていない');
 ok((await page.locator('#micStatusText').textContent()).includes('止まって'), 'マイクは停止表示');
@@ -223,16 +226,48 @@ await page.click('#revealBtn');
 await page.waitForTimeout(80);
 ok(!(await page.locator('.cell[data-id="150"] .name').isVisible()), 'もう一度押すと隠れる');
 
+console.log('\n# 世代タブ');
+// ここまでのテストで何匹埋まっているかは決め打ちできないので、増減で見る
+const num = async (sel) => Number(await page.locator(sel).textContent());
+const kantoBefore = await num('#count');
+const totalBefore = await num('#total');
+const gotBefore = await page.locator('.cell.got').count();
+
+// 表示していない世代の名前を言っても、その世代に埋まる
+await page.evaluate(() => window.__speak(['ゲッコウガ'], true));
+await page.waitForTimeout(120);
+ok((await num('#count')) === kantoBefore, 'カントーのカウンタは増えない', await page.locator('#count').textContent());
+ok((await num('#total')) === totalBefore + 1, 'ぜんたいのカウンタは増える', await page.locator('#total').textContent());
+ok((await page.locator('.tab[data-gen="6"] .tab-count').textContent()) === '1/72', 'カロスのタブに1匹入る');
+ok((await page.locator('#toast').textContent()).includes('カロス'), 'トーストが入った世代を知らせる');
+
+await page.click('.tab[data-gen="6"]');
+await page.waitForTimeout(150);
+ok(await page.locator('.cell').count() === 72, 'カロスに切り替えると72マス');
+ok(await page.locator('.cell[data-id="658"].got').count() === 1, 'ゲッコウガが埋まっている');
+ok((await num('#count')) === 1, 'カウンタがカロスのぶんになる', await page.locator('#count').textContent());
+ok((await page.locator('#countLabel').textContent()) === 'カロス', 'ラベルがカロスになる');
+
+await page.click('.tab[data-gen="1"]');
+await page.waitForTimeout(150);
+ok(await page.locator('.cell').count() === 151, 'カントーに戻ると151マス');
+ok(await page.locator('.cell.got').count() === gotBefore, '戻っても埋めたぶんは残っている',
+   `${await page.locator('.cell.got').count()} / 期待 ${gotBefore}`);
+ok((await num('#count')) === kantoBefore, 'カントーのカウンタも元どおり');
+
 console.log('\n# 全部そろったとき');
 await page.evaluate(() => {
-  const btn = document.getElementById('manualInput');
-  window.POKEMON_GEN1.forEach(p => {
-    btn.value = p.name;
-    document.getElementById('manualForm').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+  const input = document.getElementById('manualInput');
+  const form = document.getElementById('manualForm');
+  window.POKEMON_ALL.forEach(p => {
+    input.value = p.name;
+    form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
   });
 });
-await page.waitForTimeout(800);
-ok((await page.locator('#count').textContent()) === '151', '151匹そろう', await page.locator('#count').textContent());
+await page.waitForTimeout(900);
+ok((await page.locator('#count').textContent()) === '151', 'カントーが151匹そろう', await page.locator('#count').textContent());
+ok((await page.locator('#total').textContent()) === '1025', '1025匹そろう', await page.locator('#total').textContent());
+ok(await page.locator('.tab.complete').count() === 9, '9世代すべてのタブが完了表示になる');
 ok((await page.locator('#toast').textContent()).includes('コンプリート'), '完走メッセージが出る');
 const w = await page.evaluate(() => document.getElementById('progressBar').style.width);
 ok(parseFloat(w) === 100, '進捗バーが100%', w);

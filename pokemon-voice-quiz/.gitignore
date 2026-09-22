@@ -3,3 +3,6 @@ sprites/
 
 # テスト用（npm i playwright）
 node_modules/
+
+# build-data.mjs が落としてくる PokeAPI の CSV
+.cache/

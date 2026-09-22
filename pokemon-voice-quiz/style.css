@@ -232,6 +232,60 @@ body.listening .mic-status .dot {
 }
 
 /* ---------- 操作 ---------- */
+/* ---------- 世代タブ ---------- */
+.tabs {
+  display: flex;
+  gap: 6px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 var(--gutter) 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.25;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab:hover { color: var(--text); }
+
+.tab .tab-count {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.tab[aria-selected="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+.tab[aria-selected="true"] .tab-count { color: var(--accent-ink); opacity: .7; }
+
+/* その世代を言い切ったタブ */
+.tab.complete { border-color: var(--green); }
+.tab.complete .tab-count { color: var(--green); }
+.tab[aria-selected="true"].complete { border-color: var(--green); }
+.tab[aria-selected="true"].complete .tab-count { color: var(--accent-ink); }
+
 .controls {
   max-width: 1180px;
   margin: 14px auto 0;
@@ -396,6 +450,11 @@ body.revealed .cell:not(.got) .sprite { display: block; opacity: .28; filter: gr
   .cell .name { font-size: 10px; }
   .cell.got .no { font-size: 9px; }
   .topbar { padding: 12px var(--gutter) 8px; }
+  /* そろった / ぜんたい / タイム の3つが並ぶので詰める */
+  .stats { gap: 11px; }
+  .stat-value { font-size: 20px; }
+  .tabs { gap: 5px; padding-bottom: 8px; }
+  .tab { padding: 5px 11px; font-size: 12px; }
   .tagline { font-size: 12px; }
   .mic-panel { gap: 12px; padding: 8px var(--gutter); }
   .mic-btn { padding: 10px 16px 10px 13px; }

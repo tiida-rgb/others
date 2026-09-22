@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>カントー151 音声クイズ</title>
-<meta name="description" content="第1世代ポケモン151匹を声で答えるクイズ。マイクが常時聞き取って、言えたぶんだけ図鑑が埋まっていきます。">
+<title>ぜんこく1025 音声クイズ</title>
+<meta name="description" content="第1〜第9世代のポケモン1025匹を声で答えるクイズ。マイクが常時聞き取って、言えたぶんだけ図鑑が埋まっていきます。">
 <meta name="theme-color" content="#0d1117">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
 <link rel="stylesheet" href="style.css">
@@ -13,13 +13,17 @@
 
 <header class="topbar">
   <div class="brand">
-    <h1>カントー151 <small>音声クイズ</small></h1>
+    <h1>ぜんこく1025 <small>音声クイズ</small></h1>
     <p class="tagline">マイクは出しっぱなし。言うだけで埋まります。</p>
   </div>
   <div class="stats">
     <div class="stat">
-      <span class="stat-value"><b id="count">0</b><i>/151</i></span>
-      <span class="stat-label">そろった</span>
+      <span class="stat-value"><b id="count">0</b><i id="countMax">/151</i></span>
+      <span class="stat-label" id="countLabel">カントー</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value"><b id="total">0</b><i>/1025</i></span>
+      <span class="stat-label">ぜんたい</span>
     </div>
     <div class="stat">
       <span class="stat-value" id="timer">00:00</span>
@@ -50,6 +54,10 @@
     <div class="interim" id="interim" aria-live="polite"></div>
   </div>
 </section>
+
+<nav class="tabs" id="tabs" role="tablist" aria-label="世代">
+  <!-- タブは app.js が世代データから作る -->
+</nav>
 </div>
 
 <div id="notice" class="notice" hidden></div>
@@ -64,7 +72,7 @@
     <button type="button" id="resetBtn" class="ghost danger">リセット</button>
     <label class="toggle"><input type="checkbox" id="soundToggle" checked><span>効果音</span></label>
   </div>
-  <p class="hint">埋まったマスをタップすると取り消せます（誤認識したとき用）。ニドラン♀♂は「ニドラン」を2回。</p>
+  <p class="hint">どの世代の名前を言っても、その世代のタブに埋まります。埋まったマスをタップすると取り消せます（誤認識したとき用）。ニドラン♀♂とパモット／パーモットは、声だと同じに聞こえるので2回言うと両方埋まります。</p>
 </section>
 
 <main>
@@ -79,7 +87,7 @@
 </section>
 
 <footer class="foot">
-  <p>音声認識は Chrome / Edge の Web Speech API を使っています。Safari・Firefox では手入力でも遊べます。</p>
+  <p>音声認識は Chrome / Edge の Web Speech API を使っています。iPhone は Safari のみ対応、Firefox では手入力でも遊べます。</p>
   <p>ポケモン名データ出典: <a href="https://github.com/PokeAPI/pokeapi" rel="noopener">PokeAPI</a> / 画像: <a href="https://github.com/PokeAPI/sprites" rel="noopener">PokeAPI sprites</a></p>
 </footer>
 
